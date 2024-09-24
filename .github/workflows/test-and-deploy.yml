@@ -1,0 +1,48 @@
+name: Test $ Deploy sorceress
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  run-tests:
+    name: run-tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: install make
+        run: sudo apt install make -y
+      - name: run tests
+        run: sudo make requirements && sudo make dev-setup && sudo make run-checks
+      # - name: install lambda_layer requirements
+      #   run: sudo pip install -r layer/lambda_layer.txt -t terraform/lambda_layer/python/lib/python3.11/site-packages/
+      # - name: install lambda_wrangler_layer requirements
+      #   run: sudo pip install -r layer/lambda_wrangler_layer.txt -t terraform/lambda_wrangler_layer/python/lib/python3.11/site-packages/
+      # - name: list the layer directory
+      #   run: cd terraform/lambda_wrangler_layer/python/lib/python3.11/site-packages/
+
+  deploy-infrastructure:
+    name: deploy-infrastructure
+    needs: run-tests
+    environment: dev
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v4
+      - name: AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: eu-west-2
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      - name: install terraform
+        uses: hashicorp/setup-terraform@v3
+      - name: run terraform
+        working-directory: terraform
+        run: terraform init && terraform plan && terraform apply -auto-approve
